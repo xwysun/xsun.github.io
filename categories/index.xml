@@ -6,26 +6,26 @@
     <description>Recent content in Categories on xsun blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>zh-cn</language>
-    <lastBuildDate>Sat, 23 Nov 2019 15:53:30 +0800</lastBuildDate>
+    <lastBuildDate>Sat, 23 Nov 2019 16:40:46 +0800</lastBuildDate>
     
 	<atom:link href="http://io.xsun.ltd/categories/index.xml" rel="self" type="application/rss+xml" />
     
     
     <item>
-      <title>category</title>
-      <link>http://io.xsun.ltd/categories/category/</link>
-      <pubDate>Sat, 23 Nov 2019 15:53:30 +0800</pubDate>
+      <title>基础知识</title>
+      <link>http://io.xsun.ltd/categories/%E5%9F%BA%E7%A1%80%E7%9F%A5%E8%AF%86/</link>
+      <pubDate>Sat, 23 Nov 2019 16:40:46 +0800</pubDate>
       
-      <guid>http://io.xsun.ltd/categories/category/</guid>
+      <guid>http://io.xsun.ltd/categories/%E5%9F%BA%E7%A1%80%E7%9F%A5%E8%AF%86/</guid>
       <description></description>
     </item>
     
     <item>
-      <title>subcategory</title>
-      <link>http://io.xsun.ltd/categories/subcategory/</link>
-      <pubDate>Sat, 23 Nov 2019 15:53:30 +0800</pubDate>
+      <title>网络</title>
+      <link>http://io.xsun.ltd/categories/%E7%BD%91%E7%BB%9C/</link>
+      <pubDate>Sat, 23 Nov 2019 16:40:46 +0800</pubDate>
       
-      <guid>http://io.xsun.ltd/categories/subcategory/</guid>
+      <guid>http://io.xsun.ltd/categories/%E7%BD%91%E7%BB%9C/</guid>
       <description></description>
     </item>
     

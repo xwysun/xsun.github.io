@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+  <head>
+    
+    <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="generator" content="Hugo 0.59.1 with theme Tranquilpeak 0.4.7-BETA">
+<meta name="author" content="X sun">
+<meta name="keywords" content="网络">
+<meta name="description" content="https详细解析
+
+https请求流程
+
+
+客户端发起一个https的请求，把自身支持的一系列Cipher Suite（密钥算法套件，简称Cipher）发送给服务端
+服务端，接收到客户端所有的Cipher后与自身支持的对比，如果不支持则连接断开，反之则会从中选出一种加密算法和HASH算法以证书的形式返回给客户端 证书中还包含了 公钥 颁证机构 网址 失效日期等等。
+
+客户端收到服务端响应后会做以下几件事
+
+3.1 验证证书的合法性：
+颁发证书的机构是否合法与是否过期，证书中包含的网站地址是否与正在访问的地址一致等。
+证书验证通过后，在浏览器的地址栏会加上一把小锁(每家浏览器验证通过后的提示不一样 不做讨论)
+
+
+3.2 生成随机密码
+    如果证书验证通过，或者用户接受了不授信的证书，此时浏览器会生成一串随机数，然后用证书中的公钥加密。
+
+3.3 HASH握手信息
+用最开始约定好的HASH方式，把握手消息取HASH值，然后用 随机数加密“握手消息&#43;握手消息HASH值(签名)”并一起发送给服务端
+在这里之所以要取握手消息的HASH值，主要是把握手消息做一个签名，用于验证握手消息在传输过程中没有被篡改过。
+
+
+
+服务端拿到客户端传来的密文，用自己的私钥来解密握手消息取出随机数密码，再用随机数密码 解密 握手消息与HASH值，并与传过来的HASH值做对比确认是否一致。
+
+然后用随机密码加密一段握手消息(握手消息&#43;握手消息的HASH值 )给客户端
+
+客户端用随机数解密并计算握手消息的HASH，如果与服务端发来的HASH一致，此时握手过程结束，之后所有的通信数据将由之前浏览器生成的随机密码并利用对称加密算法进行加密
+
+因为这串密钥只有客户端和服务端知道，所以即使中间请求被拦截也是没法解密数据的，以此保证了通信的安全
+
+非对称加密算法：RSA，DSA/DSS     在客户端与服务端相互验证的过程中用的是对称加密
+对称加密算法：AES，RC4，3DES     客户端与服务端相互验证通过后，以随机数作为密钥时，就是对称加密
+HASH算法：MD5，SHA1，SHA256  在确认握手消息没有被篡改时
+
+
+TCP连接的建立与中止
+
+三次握手：
+
+
+
+1、clinet向server端发送一个[SYN]包，seq=x。
+
+2、server收到[SYN]包之后，向clinet发送[SYN ACK] seq=y，ack=x&#43;1
+
+3、clinet收到server的syn和ack之后，再向server端发送[ACK]ack=y&#43;1包，至此三次握手完成。
+
+对应状态：
+
+1、发起握手的时候，clinet发送[SYN]包之后，自身马上变成SYN_SENT状态，server则是进行了listen，自身的状态则变成LISTEN。接受到[SYN]包之后，自身变成SYN_RCVD状态。这个过程主要含义是clinet向server建立一条发送数据的连接。
+
+2、server端收到了client的SYN之后，马上会发送一个[SYN ACK]包，这里一共有两个作用。ACK用于应答client，表示client-&gt;server的连接已经建立，同时server也想向client建立一条发送数据的连接，因此也需要发送一个[SYN]包。
+
+3、client收到了server的[SYN ACK]。通过server发的ACK确定了client-&gt;server这条连接建立。自身状态变成了ESTABLISHED，表示可以正常的发送数据给server了。同时为了响应server发送的建立连接的SYN请求，再次给server做一次ACK的应答，一旦server收到clinet的ACK应答，server的状态也会变成ESTABLISHED。
+
+四次挥手：
+
+
+
+1、client发送[FIN]包，表示要断开clinet-&gt;server的连接。
+
+2、server收到[FIN]之后，发送一个[ACK]包表示确定断开连接啦。
+
+3、同时server也会向clinet再发一个[FIN]包，表示也想断开server-&gt;clinet的连接。
+
+4、clinet收到server的[ACK]包，确定了clinet-&gt;server的连接的断开，该连接将不会发送数据啦。由于client也会收到server的[FIN]包，因此也要为断开server-&gt;clinet的连接发送[ACK]给server确定。
+
+对应状态：
+
+1、client和server端传送数据的时候，双方的状态都是ESTABLISHED。一旦clinet发送了fin之后，自身变成FIN-WAIT-1的状态，意思是等待server端的ack确定。此时，该通道不再向server发送数据，但是仍然可以接收server数据了。
+
+2、server收到了clinet发送的ack之后，自身的状态由ESTABLISHED变成CLOSE_WAIT。client收到ack后，自身由FIN-WAIT-1变成FIN-WAIT-2，断开了连接。此时client在等待server端的fin信号。
+
+3、server 发送ack之后，自身就由CLOSE_WAIT变成LAST-ACK状态，即等待client的最后的ack确定。client收到server的fin包之后，自身就由 FIN-WAIT-2 变成 TIME_WAIT状态，等待一个2MSL时间之后，就变成了CLOSED状态。
+
+HTTP报文解析：
+
+请求报文
+
+
+
+响应报文
+
+">
+
+
+<meta property="og:description" content="https详细解析
+
+https请求流程
+
+
+客户端发起一个https的请求，把自身支持的一系列Cipher Suite（密钥算法套件，简称Cipher）发送给服务端
+服务端，接收到客户端所有的Cipher后与自身支持的对比，如果不支持则连接断开，反之则会从中选出一种加密算法和HASH算法以证书的形式返回给客户端 证书中还包含了 公钥 颁证机构 网址 失效日期等等。
+
+客户端收到服务端响应后会做以下几件事
+
+3.1 验证证书的合法性：
+颁发证书的机构是否合法与是否过期，证书中包含的网站地址是否与正在访问的地址一致等。
+证书验证通过后，在浏览器的地址栏会加上一把小锁(每家浏览器验证通过后的提示不一样 不做讨论)
+
+
+3.2 生成随机密码
+    如果证书验证通过，或者用户接受了不授信的证书，此时浏览器会生成一串随机数，然后用证书中的公钥加密。
+
+3.3 HASH握手信息
+用最开始约定好的HASH方式，把握手消息取HASH值，然后用 随机数加密“握手消息&#43;握手消息HASH值(签名)”并一起发送给服务端
+在这里之所以要取握手消息的HASH值，主要是把握手消息做一个签名，用于验证握手消息在传输过程中没有被篡改过。
+
+
+
+服务端拿到客户端传来的密文，用自己的私钥来解密握手消息取出随机数密码，再用随机数密码 解密 握手消息与HASH值，并与传过来的HASH值做对比确认是否一致。
+
+然后用随机密码加密一段握手消息(握手消息&#43;握手消息的HASH值 )给客户端
+
+客户端用随机数解密并计算握手消息的HASH，如果与服务端发来的HASH一致，此时握手过程结束，之后所有的通信数据将由之前浏览器生成的随机密码并利用对称加密算法进行加密
+
+因为这串密钥只有客户端和服务端知道，所以即使中间请求被拦截也是没法解密数据的，以此保证了通信的安全
+
+非对称加密算法：RSA，DSA/DSS     在客户端与服务端相互验证的过程中用的是对称加密
+对称加密算法：AES，RC4，3DES     客户端与服务端相互验证通过后，以随机数作为密钥时，就是对称加密
+HASH算法：MD5，SHA1，SHA256  在确认握手消息没有被篡改时
+
+
+TCP连接的建立与中止
+
+三次握手：
+
+
+
+1、clinet向server端发送一个[SYN]包，seq=x。
+
+2、server收到[SYN]包之后，向clinet发送[SYN ACK] seq=y，ack=x&#43;1
+
+3、clinet收到server的syn和ack之后，再向server端发送[ACK]ack=y&#43;1包，至此三次握手完成。
+
+对应状态：
+
+1、发起握手的时候，clinet发送[SYN]包之后，自身马上变成SYN_SENT状态，server则是进行了listen，自身的状态则变成LISTEN。接受到[SYN]包之后，自身变成SYN_RCVD状态。这个过程主要含义是clinet向server建立一条发送数据的连接。
+
+2、server端收到了client的SYN之后，马上会发送一个[SYN ACK]包，这里一共有两个作用。ACK用于应答client，表示client-&gt;server的连接已经建立，同时server也想向client建立一条发送数据的连接，因此也需要发送一个[SYN]包。
+
+3、client收到了server的[SYN ACK]。通过server发的ACK确定了client-&gt;server这条连接建立。自身状态变成了ESTABLISHED，表示可以正常的发送数据给server了。同时为了响应server发送的建立连接的SYN请求，再次给server做一次ACK的应答，一旦server收到clinet的ACK应答，server的状态也会变成ESTABLISHED。
+
+四次挥手：
+
+
+
+1、client发送[FIN]包，表示要断开clinet-&gt;server的连接。
+
+2、server收到[FIN]之后，发送一个[ACK]包表示确定断开连接啦。
+
+3、同时server也会向clinet再发一个[FIN]包，表示也想断开server-&gt;clinet的连接。
+
+4、clinet收到server的[ACK]包，确定了clinet-&gt;server的连接的断开，该连接将不会发送数据啦。由于client也会收到server的[FIN]包，因此也要为断开server-&gt;clinet的连接发送[ACK]给server确定。
+
+对应状态：
+
+1、client和server端传送数据的时候，双方的状态都是ESTABLISHED。一旦clinet发送了fin之后，自身变成FIN-WAIT-1的状态，意思是等待server端的ack确定。此时，该通道不再向server发送数据，但是仍然可以接收server数据了。
+
+2、server收到了clinet发送的ack之后，自身的状态由ESTABLISHED变成CLOSE_WAIT。client收到ack后，自身由FIN-WAIT-1变成FIN-WAIT-2，断开了连接。此时client在等待server端的fin信号。
+
+3、server 发送ack之后，自身就由CLOSE_WAIT变成LAST-ACK状态，即等待client的最后的ack确定。client收到server的fin包之后，自身就由 FIN-WAIT-2 变成 TIME_WAIT状态，等待一个2MSL时间之后，就变成了CLOSED状态。
+
+HTTP报文解析：
+
+请求报文
+
+
+
+响应报文
+
+">
+<meta property="og:type" content="article">
+<meta property="og:title" content="TCP/HTTP/HTTPS基础">
+<meta name="twitter:title" content="TCP/HTTP/HTTPS基础">
+<meta property="og:url" content="http://io.xsun.ltd/2019/11/tcp/http/https%E5%9F%BA%E7%A1%80/">
+<meta property="twitter:url" content="http://io.xsun.ltd/2019/11/tcp/http/https%E5%9F%BA%E7%A1%80/">
+<meta property="og:site_name" content="xsun blog">
+<meta property="og:description" content="https详细解析
+
+https请求流程
+
+
+客户端发起一个https的请求，把自身支持的一系列Cipher Suite（密钥算法套件，简称Cipher）发送给服务端
+服务端，接收到客户端所有的Cipher后与自身支持的对比，如果不支持则连接断开，反之则会从中选出一种加密算法和HASH算法以证书的形式返回给客户端 证书中还包含了 公钥 颁证机构 网址 失效日期等等。
+
+客户端收到服务端响应后会做以下几件事
+
+3.1 验证证书的合法性：
+颁发证书的机构是否合法与是否过期，证书中包含的网站地址是否与正在访问的地址一致等。
+证书验证通过后，在浏览器的地址栏会加上一把小锁(每家浏览器验证通过后的提示不一样 不做讨论)
+
+
+3.2 生成随机密码
+    如果证书验证通过，或者用户接受了不授信的证书，此时浏览器会生成一串随机数，然后用证书中的公钥加密。
+
+3.3 HASH握手信息
+用最开始约定好的HASH方式，把握手消息取HASH值，然后用 随机数加密“握手消息&#43;握手消息HASH值(签名)”并一起发送给服务端
+在这里之所以要取握手消息的HASH值，主要是把握手消息做一个签名，用于验证握手消息在传输过程中没有被篡改过。
+
+
+
+服务端拿到客户端传来的密文，用自己的私钥来解密握手消息取出随机数密码，再用随机数密码 解密 握手消息与HASH值，并与传过来的HASH值做对比确认是否一致。
+
+然后用随机密码加密一段握手消息(握手消息&#43;握手消息的HASH值 )给客户端
+
+客户端用随机数解密并计算握手消息的HASH，如果与服务端发来的HASH一致，此时握手过程结束，之后所有的通信数据将由之前浏览器生成的随机密码并利用对称加密算法进行加密
+
+因为这串密钥只有客户端和服务端知道，所以即使中间请求被拦截也是没法解密数据的，以此保证了通信的安全
+
+非对称加密算法：RSA，DSA/DSS     在客户端与服务端相互验证的过程中用的是对称加密
+对称加密算法：AES，RC4，3DES     客户端与服务端相互验证通过后，以随机数作为密钥时，就是对称加密
+HASH算法：MD5，SHA1，SHA256  在确认握手消息没有被篡改时
+
+
+TCP连接的建立与中止
+
+三次握手：
+
+
+
+1、clinet向server端发送一个[SYN]包，seq=x。
+
+2、server收到[SYN]包之后，向clinet发送[SYN ACK] seq=y，ack=x&#43;1
+
+3、clinet收到server的syn和ack之后，再向server端发送[ACK]ack=y&#43;1包，至此三次握手完成。
+
+对应状态：
+
+1、发起握手的时候，clinet发送[SYN]包之后，自身马上变成SYN_SENT状态，server则是进行了listen，自身的状态则变成LISTEN。接受到[SYN]包之后，自身变成SYN_RCVD状态。这个过程主要含义是clinet向server建立一条发送数据的连接。
+
+2、server端收到了client的SYN之后，马上会发送一个[SYN ACK]包，这里一共有两个作用。ACK用于应答client，表示client-&gt;server的连接已经建立，同时server也想向client建立一条发送数据的连接，因此也需要发送一个[SYN]包。
+
+3、client收到了server的[SYN ACK]。通过server发的ACK确定了client-&gt;server这条连接建立。自身状态变成了ESTABLISHED，表示可以正常的发送数据给server了。同时为了响应server发送的建立连接的SYN请求，再次给server做一次ACK的应答，一旦server收到clinet的ACK应答，server的状态也会变成ESTABLISHED。
+
+四次挥手：
+
+
+
+1、client发送[FIN]包，表示要断开clinet-&gt;server的连接。
+
+2、server收到[FIN]之后，发送一个[ACK]包表示确定断开连接啦。
+
+3、同时server也会向clinet再发一个[FIN]包，表示也想断开server-&gt;clinet的连接。
+
+4、clinet收到server的[ACK]包，确定了clinet-&gt;server的连接的断开，该连接将不会发送数据啦。由于client也会收到server的[FIN]包，因此也要为断开server-&gt;clinet的连接发送[ACK]给server确定。
+
+对应状态：
+
+1、client和server端传送数据的时候，双方的状态都是ESTABLISHED。一旦clinet发送了fin之后，自身变成FIN-WAIT-1的状态，意思是等待server端的ack确定。此时，该通道不再向server发送数据，但是仍然可以接收server数据了。
+
+2、server收到了clinet发送的ack之后，自身的状态由ESTABLISHED变成CLOSE_WAIT。client收到ack后，自身由FIN-WAIT-1变成FIN-WAIT-2，断开了连接。此时client在等待server端的fin信号。
+
+3、server 发送ack之后，自身就由CLOSE_WAIT变成LAST-ACK状态，即等待client的最后的ack确定。client收到server的fin包之后，自身就由 FIN-WAIT-2 变成 TIME_WAIT状态，等待一个2MSL时间之后，就变成了CLOSED状态。
+
+HTTP报文解析：
+
+请求报文
+
+
+
+响应报文
+
+">
+<meta name="twitter:description" content="https详细解析
+
+https请求流程
+
+
+客户端发起一个https的请求，把自身支持的一系列Cipher Suite（密钥算法套件，简称Cipher）发送给服务端
+服务端，接收到客户端所有的Cipher后与自身支持的对比，如果不支持则连接断开，反之则会从中选出一种加密算法和HASH算法以证书的形式返回给客户端 证书中还包含了 公钥 颁证机构 网址 失效日期等等。
+
+客户端收到服务端响应后会做以下几件事
+
+3.1 验证证书的合法性：
+颁发证书的机构是否合法与是否过期，证书中包含的网站地址是否与正在访问的地址一致等。
+证书验证通过后，在浏览器的地址栏会加上一把小锁(每家浏览器验证通过后的提示不一样 不做讨论)
+
+
+3.2 生成随机密码
+    如果证书验证通过，或者用户接受了不授信的证书，此时浏览器会生成一串随机数，然后用证书中的公钥加密。
+
+3.3 HASH握手信息
+用最开始约定好的HASH方式，把握手消息取HASH值，然后用 随机数加密“握手消息&#43;握手消息HASH值(签名)”并一起发送给服务端
+在这里之所以要取握手消息的HASH值，主要是把握手消息做一个签名，用于验证握手消息在传输过程中没有被篡改过。
+
+
+
+服务端拿到客户端传来的密文，用自己的私钥来解密握手消息取出随机数密码，再用随机数密码 解密 握手消息与HASH值，并与传过来的HASH值做对比确认是否一致。
+
+然后用随机密码加密一段握手消息(握手消息&#43;握手消息的HASH值 )给客户端
+
+客户端用随机数解密并计算握手消息的HASH，如果与服务端发来的HASH一致，此时握手过程结束，之后所有的通信数据将由之前浏览器生成的随机密码并利用对称加密算法进行加密
+
+因为这串密钥只有客户端和服务端知道，所以即使中间请求被拦截也是没法解密数据的，以此保证了通信的安全
+
+非对称加密算法：RSA，DSA/DSS     在客户端与服务端相互验证的过程中用的是对称加密
+对称加密算法：AES，RC4，3DES     客户端与服务端相互验证通过后，以随机数作为密钥时，就是对称加密
+HASH算法：MD5，SHA1，SHA256  在确认握手消息没有被篡改时
+
+
+TCP连接的建立与中止
+
+三次握手：
+
+
+
+1、clinet向server端发送一个[SYN]包，seq=x。
+
+2、server收到[SYN]包之后，向clinet发送[SYN ACK] seq=y，ack=x&#43;1
+
+3、clinet收到server的syn和ack之后，再向server端发送[ACK]ack=y&#43;1包，至此三次握手完成。
+
+对应状态：
+
+1、发起握手的时候，clinet发送[SYN]包之后，自身马上变成SYN_SENT状态，server则是进行了listen，自身的状态则变成LISTEN。接受到[SYN]包之后，自身变成SYN_RCVD状态。这个过程主要含义是clinet向server建立一条发送数据的连接。
+
+2、server端收到了client的SYN之后，马上会发送一个[SYN ACK]包，这里一共有两个作用。ACK用于应答client，表示client-&gt;server的连接已经建立，同时server也想向client建立一条发送数据的连接，因此也需要发送一个[SYN]包。
+
+3、client收到了server的[SYN ACK]。通过server发的ACK确定了client-&gt;server这条连接建立。自身状态变成了ESTABLISHED，表示可以正常的发送数据给server了。同时为了响应server发送的建立连接的SYN请求，再次给server做一次ACK的应答，一旦server收到clinet的ACK应答，server的状态也会变成ESTABLISHED。
+
+四次挥手：
+
+
+
+1、client发送[FIN]包，表示要断开clinet-&gt;server的连接。
+
+2、server收到[FIN]之后，发送一个[ACK]包表示确定断开连接啦。
+
+3、同时server也会向clinet再发一个[FIN]包，表示也想断开server-&gt;clinet的连接。
+
+4、clinet收到server的[ACK]包，确定了clinet-&gt;server的连接的断开，该连接将不会发送数据啦。由于client也会收到server的[FIN]包，因此也要为断开server-&gt;clinet的连接发送[ACK]给server确定。
+
+对应状态：
+
+1、client和server端传送数据的时候，双方的状态都是ESTABLISHED。一旦clinet发送了fin之后，自身变成FIN-WAIT-1的状态，意思是等待server端的ack确定。此时，该通道不再向server发送数据，但是仍然可以接收server数据了。
+
+2、server收到了clinet发送的ack之后，自身的状态由ESTABLISHED变成CLOSE_WAIT。client收到ack后，自身由FIN-WAIT-1变成FIN-WAIT-2，断开了连接。此时client在等待server端的fin信号。
+
+3、server 发送ack之后，自身就由CLOSE_WAIT变成LAST-ACK状态，即等待client的最后的ack确定。client收到server的fin包之后，自身就由 FIN-WAIT-2 变成 TIME_WAIT状态，等待一个2MSL时间之后，就变成了CLOSED状态。
+
+HTTP报文解析：
+
+请求报文
+
+
+
+响应报文
+
+">
+<meta property="og:locale" content="en">
+
+  
+    <meta property="article:published_time" content="2019-11-23T16:40:46">
+  
+  
+    <meta property="article:modified_time" content="2019-11-23T16:40:46">
+  
+  
+  
+    
+      <meta property="article:section" content="基础知识">
+    
+      <meta property="article:section" content="网络">
+    
+  
+  
+    
+      <meta property="article:tag" content="网络">
+    
+  
+
+
+<meta name="twitter:card" content="summary">
+
+
+
+
+
+
+
+
+
+
+
+  <meta property="og:image" content="https://www.gravatar.com/avatar/d09dc2d7aa5c467519e8af89f7b3d94c?s=640">
+  <meta property="twitter:image" content="https://www.gravatar.com/avatar/d09dc2d7aa5c467519e8af89f7b3d94c?s=640">
+
+
+    <title>TCP/HTTP/HTTPS基础</title>
+
+    <link rel="icon" href="http://io.xsun.ltd/favicon.png">
+    
+
+    
+
+    <link rel="canonical" href="http://io.xsun.ltd/2019/11/tcp/http/https%E5%9F%BA%E7%A1%80/">
+
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha256-eZrrJcwDc/3uDhsdt61sL2oOBY362qM3lon1gyExkL0=" crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancybox/2.1.4/jquery.fancybox.min.css" integrity="sha256-vuXZ9LGmmwtjqFX1F+EKin1ThZMub58gKULUyf0qECk=" crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancybox/2.1.4/helpers/jquery.fancybox-thumbs.min.css" integrity="sha256-SEa4XYAHihTcEP1f5gARTB2K26Uk8PsndQYHQC1f4jU=" crossorigin="anonymous" />
+    
+    
+    <link rel="stylesheet" href="http://io.xsun.ltd/css/style-twzjdbqhmnnacqs0pwwdzcdbt8yhv8giawvjqjmyfoqnvazl0dalmnhdkvp7.min.css" />
+    
+    
+
+    
+      
+    
+    
+  </head>
+
+  <body>
+    <div id="blog">
+      <header id="header" data-behavior="4">
+  <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
+  <div class="header-title">
+    <a class="header-title-link" href="http://io.xsun.ltd/">xsun blog</a>
+  </div>
+  
+</header>
+
+      <nav id="sidebar" data-behavior="4">
+  <div class="sidebar-container">
+    
+      <div class="sidebar-profile">
+        <a href="http://io.xsun.ltd/#about">
+          <img class="sidebar-profile-picture" src="https://www.gravatar.com/avatar/d09dc2d7aa5c467519e8af89f7b3d94c?s=110" alt="" />
+        </a>
+        <h4 class="sidebar-profile-name">X sun</h4>
+        
+          <h5 class="sidebar-profile-bio">new blog site</h5>
+        
+      </div>
+    
+    <ul class="sidebar-buttons">
+      
+  <li class="sidebar-button">
+    
+      <a class="sidebar-button-link " href="http://io.xsun.ltd/">
+    
+      <i class="sidebar-button-icon fa fa-lg fa-home"></i>
+      
+      <span class="sidebar-button-desc">Home</span>
+    </a>
+  </li>
+
+  <li class="sidebar-button">
+    
+      <a class="sidebar-button-link " href="http://io.xsun.ltd/categories">
+    
+      <i class="sidebar-button-icon fa fa-lg fa-bookmark"></i>
+      
+      <span class="sidebar-button-desc">Categories</span>
+    </a>
+  </li>
+
+  <li class="sidebar-button">
+    
+      <a class="sidebar-button-link " href="http://io.xsun.ltd/tags">
+    
+      <i class="sidebar-button-icon fa fa-lg fa-tags"></i>
+      
+      <span class="sidebar-button-desc">Tags</span>
+    </a>
+  </li>
+
+  <li class="sidebar-button">
+    
+      <a class="sidebar-button-link " href="http://io.xsun.ltd/archives">
+    
+      <i class="sidebar-button-icon fa fa-lg fa-archive"></i>
+      
+      <span class="sidebar-button-desc">Archives</span>
+    </a>
+  </li>
+
+  <li class="sidebar-button">
+    
+      <a class="sidebar-button-link " href="http://io.xsun.ltd/#about">
+    
+      <i class="sidebar-button-icon fa fa-lg fa-question"></i>
+      
+      <span class="sidebar-button-desc">About</span>
+    </a>
+  </li>
+
+  <li class="sidebar-button">
+    
+      <a class="sidebar-button-link " href="https://github.com/xwysun" target="_blank" rel="noopener">
+    
+      <i class="sidebar-button-icon fa fa-lg fa-github"></i>
+      
+      <span class="sidebar-button-desc">GitHub</span>
+    </a>
+  </li>
+
+
+    </ul>
+    <ul class="sidebar-buttons">
+      
+
+    </ul>
+    <ul class="sidebar-buttons">
+      
+
+    </ul>
+  </div>
+</nav>
+
+      
+
+      <div id="main" data-behavior="4"
+        class="
+               hasCoverMetaIn
+               ">
+        <article class="post" itemscope itemType="http://schema.org/BlogPosting">
+          
+          
+            <div class="post-header main-content-wrap text-left">
+  
+    <h1 class="post-title" itemprop="headline">
+      TCP/HTTP/HTTPS基础
+    </h1>
+  
+  
+  <div class="postShorten-meta post-meta">
+    
+      <time itemprop="datePublished" datetime="2019-11-23T16:40:46&#43;08:00">
+        
+   23, 2019
+
+      </time>
+    
+    
+  
+  
+    <span></span>
+    
+      <a class="category-link" href="http://io.xsun.ltd/categories/%e5%9f%ba%e7%a1%80%e7%9f%a5%e8%af%86">基础知识</a>, 
+    
+      <a class="category-link" href="http://io.xsun.ltd/categories/%e7%bd%91%e7%bb%9c">网络</a>
+    
+  
+
+  </div>
+
+</div>
+          
+          <div class="post-content markdown" itemprop="articleBody">
+            <div class="main-content-wrap">
+              <h2 id="https详细解析">https详细解析</h2>
+
+<h3 id="https请求流程">https请求流程</h3>
+
+<ol>
+<li>客户端发起一个https的请求，把自身支持的一系列Cipher Suite（密钥算法套件，简称Cipher）发送给服务端</li>
+<li>服务端，接收到客户端所有的Cipher后与自身支持的对比，如果不支持则连接断开，反之则会从中选出一种加密算法和HASH算法以证书的形式返回给客户端 证书中还包含了 公钥 颁证机构 网址 失效日期等等。</li>
+
+<li><p>客户端收到服务端响应后会做以下几件事</p>
+
+<p>3.1 验证证书的合法性：
+颁发证书的机构是否合法与是否过期，证书中包含的网站地址是否与正在访问的地址一致等。
+证书验证通过后，在浏览器的地址栏会加上一把小锁(每家浏览器验证通过后的提示不一样 不做讨论)</p></li>
+</ol>
+
+<p>3.2 生成随机密码
+    如果证书验证通过，或者用户接受了不授信的证书，此时浏览器会生成一串随机数，然后用证书中的公钥加密。</p>
+
+<pre><code>3.3 HASH握手信息
+用最开始约定好的HASH方式，把握手消息取HASH值，然后用 随机数加密“握手消息+握手消息HASH值(签名)”并一起发送给服务端
+在这里之所以要取握手消息的HASH值，主要是把握手消息做一个签名，用于验证握手消息在传输过程中没有被篡改过。
+</code></pre>
+
+<ol>
+<li><p>服务端拿到客户端传来的密文，用自己的私钥来解密握手消息取出随机数密码，再用随机数密码 解密 握手消息与HASH值，并与传过来的HASH值做对比确认是否一致。</p>
+
+<p>然后用随机密码加密一段握手消息(握手消息+握手消息的HASH值 )给客户端</p></li>
+
+<li><p>客户端用随机数解密并计算握手消息的HASH，如果与服务端发来的HASH一致，此时握手过程结束，之后所有的通信数据将由之前浏览器生成的随机密码并利用对称加密算法进行加密</p>
+
+<p>因为这串密钥只有客户端和服务端知道，所以即使中间请求被拦截也是没法解密数据的，以此保证了通信的安全</p>
+
+<p>非对称加密算法：RSA，DSA/DSS     在客户端与服务端相互验证的过程中用的是对称加密
+对称加密算法：AES，RC4，3DES     客户端与服务端相互验证通过后，以随机数作为密钥时，就是对称加密
+HASH算法：MD5，SHA1，SHA256  在确认握手消息没有被篡改时</p></li>
+</ol>
+
+<h3 id="tcp连接的建立与中止">TCP连接的建立与中止</h3>
+
+<p><strong>三次握手</strong>：</p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/11043-9923e3f3981f3cb4.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="image" /></p>
+
+<p>1、clinet向server端发送一个[SYN]包，seq=x。</p>
+
+<p>2、server收到[SYN]包之后，向clinet发送[SYN ACK] seq=y，ack=x+1</p>
+
+<p>3、clinet收到server的syn和ack之后，再向server端发送[ACK]ack=y+1包，至此三次握手完成。</p>
+
+<p><strong>对应状态</strong>：</p>
+
+<p>1、发起握手的时候，clinet发送[SYN]包之后，自身马上变成SYN_SENT状态，server则是进行了listen，自身的状态则变成LISTEN。接受到[SYN]包之后，自身变成SYN_RCVD状态。这个过程主要含义是clinet向server建立一条发送数据的连接。</p>
+
+<p>2、server端收到了client的SYN之后，马上会发送一个[SYN ACK]包，这里一共有两个作用。ACK用于应答client，表示client-&gt;server的连接已经建立，同时server也想向client建立一条发送数据的连接，因此也需要发送一个[SYN]包。</p>
+
+<p>3、client收到了server的[SYN ACK]。通过server发的ACK确定了client-&gt;server这条连接建立。自身状态变成了ESTABLISHED，表示可以正常的发送数据给server了。同时为了响应server发送的建立连接的SYN请求，再次给server做一次ACK的应答，一旦server收到clinet的ACK应答，server的状态也会变成ESTABLISHED。</p>
+
+<p><strong>四次挥手</strong>：</p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/11043-a0dcfd90c7842ffa.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="image" /></p>
+
+<p>1、client发送[FIN]包，表示要断开clinet-&gt;server的连接。</p>
+
+<p>2、server收到[FIN]之后，发送一个[ACK]包表示确定断开连接啦。</p>
+
+<p>3、同时server也会向clinet再发一个[FIN]包，表示也想断开server-&gt;clinet的连接。</p>
+
+<p>4、clinet收到server的[ACK]包，确定了clinet-&gt;server的连接的断开，该连接将不会发送数据啦。由于client也会收到server的[FIN]包，因此也要为断开server-&gt;clinet的连接发送[ACK]给server确定。</p>
+
+<p><strong>对应状态</strong>：</p>
+
+<p>1、client和server端传送数据的时候，双方的状态都是ESTABLISHED。一旦clinet发送了fin之后，自身变成FIN-WAIT-1的状态，意思是等待server端的ack确定。此时，该通道不再向server发送数据，但是仍然可以接收server数据了。</p>
+
+<p>2、server收到了clinet发送的ack之后，自身的状态由ESTABLISHED变成CLOSE_WAIT。client收到ack后，自身由FIN-WAIT-1变成FIN-WAIT-2，断开了连接。此时client在等待server端的fin信号。</p>
+
+<p>3、server 发送ack之后，自身就由CLOSE_WAIT变成LAST-ACK状态，即等待client的最后的ack确定。client收到server的fin包之后，自身就由 FIN-WAIT-2 变成 TIME_WAIT状态，等待一个2MSL时间之后，就变成了CLOSED状态。</p>
+
+<p><strong>HTTP报文解析</strong>：</p>
+
+<p>请求报文</p>
+
+<p><img src="http://s3.51cto.com/wyfs02/M02/22/DA/wKioL1MpX-qwK1-PAAExXPRpR8M814.jpg" alt="image" /></p>
+
+<p>响应报文</p>
+
+<p><img src="http://s3.51cto.com/wyfs02/M02/22/DB/wKiom1MpmHWALc2UAADu14JLceA655.jpg" alt="image" /></p>
+              
+            </div>
+          </div>
+          <div id="post-footer" class="post-footer main-content-wrap">
+            
+              
+                
+                
+                  <div class="post-footer-tags">
+                    <span class="text-color-light text-small"></span><br/>
+                    
+  <a class="tag tag--primary tag--small" href="http://io.xsun.ltd/tags/%E7%BD%91%E7%BB%9C/">网络</a>
+
+                  </div>
+                
+              
+            
+            <div class="post-actions-wrap">
+  
+      <nav >
+        <ul class="post-actions post-action-nav">
+          
+            <li class="post-action">
+              
+                <a class="post-action-btn btn btn--disabled">
+              
+                  <i class="fa fa-angle-left"></i>
+                  <span class="hide-xs hide-sm text-small icon-ml"></span>
+                </a>
+            </li>
+            <li class="post-action">
+              
+                <a class="post-action-btn btn btn--disabled">
+              
+                  <span class="hide-xs hide-sm text-small icon-mr"></span>
+                  <i class="fa fa-angle-right"></i>
+                </a>
+            </li>
+          
+        </ul>
+      </nav>
+    <ul class="post-actions post-action-share" >
+      
+        <li class="post-action hide-lg hide-md hide-sm">
+          <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions">
+            <i class="fa fa-share-alt"></i>
+          </a>
+        </li>
+        
+      
+      
+        <li class="post-action">
+          <a class="post-action-btn btn btn--default" href="#disqus_thread">
+            <i class="fa fa-comment-o"></i>
+          </a>
+        </li>
+      
+      <li class="post-action">
+        
+          <a class="post-action-btn btn btn--default" href="#">
+        
+          <i class="fa fa-list"></i>
+        </a>
+      </li>
+    </ul>
+  
+</div>
+
+            
+              
+                <div id="disqus_thread">
+  <noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+              
+            
+          </div>
+        </article>
+        <footer id="footer" class="main-content-wrap">
+  <span class="copyrights">
+    &copy; 2019 X sun. 
+  </span>
+</footer>
+
+      </div>
+      <div id="bottom-bar" class="post-bottom-bar" data-behavior="4">
+        <div class="post-actions-wrap">
+  
+      <nav >
+        <ul class="post-actions post-action-nav">
+          
+            <li class="post-action">
+              
+                <a class="post-action-btn btn btn--disabled">
+              
+                  <i class="fa fa-angle-left"></i>
+                  <span class="hide-xs hide-sm text-small icon-ml"></span>
+                </a>
+            </li>
+            <li class="post-action">
+              
+                <a class="post-action-btn btn btn--disabled">
+              
+                  <span class="hide-xs hide-sm text-small icon-mr"></span>
+                  <i class="fa fa-angle-right"></i>
+                </a>
+            </li>
+          
+        </ul>
+      </nav>
+    <ul class="post-actions post-action-share" >
+      
+        <li class="post-action hide-lg hide-md hide-sm">
+          <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions">
+            <i class="fa fa-share-alt"></i>
+          </a>
+        </li>
+        
+      
+      
+        <li class="post-action">
+          <a class="post-action-btn btn btn--default" href="#disqus_thread">
+            <i class="fa fa-comment-o"></i>
+          </a>
+        </li>
+      
+      <li class="post-action">
+        
+          <a class="post-action-btn btn btn--default" href="#">
+        
+          <i class="fa fa-list"></i>
+        </a>
+      </li>
+    </ul>
+  
+</div>
+
+      </div>
+      <div id="share-options-bar" class="share-options-bar" data-behavior="4">
+  <i id="btn-close-shareoptions" class="fa fa-close"></i>
+  <ul class="share-options">
+    
+  </ul>
+</div>
+<div id="share-options-mask" class="share-options-mask"></div>
+    </div>
+    
+    <div id="about">
+  <div id="about-card">
+    <div id="about-btn-close">
+      <i class="fa fa-remove"></i>
+    </div>
+    
+      <img id="about-card-picture" src="https://www.gravatar.com/avatar/d09dc2d7aa5c467519e8af89f7b3d94c?s=110" alt="" />
+    
+    <h4 id="about-card-name">X sun</h4>
+    
+      <div id="about-card-bio">new blog site</div>
+    
+    
+      <div id="about-card-job">
+        <i class="fa fa-briefcase"></i>
+        <br/>
+        coder
+      </div>
+    
+    
+      <div id="about-card-location">
+        <i class="fa fa-map-marker"></i>
+        <br/>
+        China
+      </div>
+    
+  </div>
+</div>
+
+    
+
+    
+  
+    
+      <div id="cover" style="background-image:url('http://io.xsun.ltd/images/cover.jpg');"></div>
+    
+  
+
+
+    
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.4/jquery.min.js" integrity="sha256-BbhdlvQf/xTY9gja0Dq3HiwQF8LaCRTXxZKRutelT44=" crossorigin="anonymous"></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js" integrity="sha256-/BfiIkHlHoVihZdc6TFuj7MmJ0TWcWsMXkeDFwhi0zw=" crossorigin="anonymous"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fancybox/2.1.7/js/jquery.fancybox.min.js" integrity="sha256-GEAnjcTqVP+vBp3SSc8bEDQqvWAZMiHyUSIorrWwH50=" crossorigin="anonymous"></script>
+
+
+<script src="http://io.xsun.ltd/js/script-pcw6v3xilnxydl1vddzazdverrnn9ctynvnxgwho987mfyqkuylcb1nlt.min.js"></script>
+
+
+<script lang="javascript">
+window.onload = updateMinWidth;
+window.onresize = updateMinWidth;
+document.getElementById("sidebar").addEventListener("transitionend", updateMinWidth);
+function updateMinWidth() {
+  var sidebar = document.getElementById("sidebar");
+  var main = document.getElementById("main");
+  main.style.minWidth = "";
+  var w1 = getComputedStyle(main).getPropertyValue("min-width");
+  var w2 = getComputedStyle(sidebar).getPropertyValue("width");
+  var w3 = getComputedStyle(sidebar).getPropertyValue("left");
+  main.style.minWidth = `calc(${w1} - ${w2} - ${w3})`;
+}
+</script>
+
+<script>
+$(document).ready(function() {
+  hljs.configure({ classPrefix: '', useBR: false });
+  $('pre.code-highlight > code, pre > code').each(function(i, block) {
+    if (!$(this).hasClass('codeblock')) {
+      $(this).addClass('codeblock');
+    }
+    hljs.highlightBlock(block);
+  });
+});
+</script>
+
+
+  
+    
+      <script>
+        var disqus_config = function () {
+          this.page.url = 'http:\/\/io.xsun.ltd\/2019\/11\/tcp\/http\/https%E5%9F%BA%E7%A1%80\/';
+          
+            this.page.identifier = '\/2019\/11\/tcp\/http\/https%E5%9F%BA%E7%A1%80\/'
+          
+        };
+        (function() {
+          
+          
+          if (window.location.hostname == "localhost") {
+            return;
+          }
+          var d = document, s = d.createElement('script');
+          var disqus_shortname = 'tranquilpeak';
+          s.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+
+          s.setAttribute('data-timestamp', +new Date());
+          (d.head || d.body).appendChild(s);
+        })();
+      </script>
+    
+  
+
+
+
+
+    
+  </body>
+</html>
+

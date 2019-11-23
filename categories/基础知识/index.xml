@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>xsun blog</title>
-    <link>http://io.xsun.ltd/</link>
-    <description>Recent content on xsun blog</description>
+    <title>基础知识 on xsun blog</title>
+    <link>http://io.xsun.ltd/categories/%E5%9F%BA%E7%A1%80%E7%9F%A5%E8%AF%86/</link>
+    <description>Recent content in 基础知识 on xsun blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>zh-cn</language>
     <lastBuildDate>Sat, 23 Nov 2019 16:40:46 +0800</lastBuildDate>
     
-	<atom:link href="http://io.xsun.ltd/index.xml" rel="self" type="application/rss+xml" />
+	<atom:link href="http://io.xsun.ltd/categories/%E5%9F%BA%E7%A1%80%E7%9F%A5%E8%AF%86/index.xml" rel="self" type="application/rss+xml" />
     
     
     <item>

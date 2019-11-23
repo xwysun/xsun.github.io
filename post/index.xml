@@ -6,18 +6,103 @@
     <description>Recent content in Posts on xsun blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>zh-cn</language>
-    <lastBuildDate>Sat, 23 Nov 2019 15:53:30 +0800</lastBuildDate>
+    <lastBuildDate>Sat, 23 Nov 2019 16:40:46 +0800</lastBuildDate>
     
 	<atom:link href="http://io.xsun.ltd/post/index.xml" rel="self" type="application/rss+xml" />
     
     
     <item>
-      <title>My First Post Test</title>
-      <link>http://io.xsun.ltd/2019/11/my-first-post-test/</link>
-      <pubDate>Sat, 23 Nov 2019 15:53:30 +0800</pubDate>
+      <title>TCP/HTTP/HTTPS基础</title>
+      <link>http://io.xsun.ltd/2019/11/tcp/http/https%E5%9F%BA%E7%A1%80/</link>
+      <pubDate>Sat, 23 Nov 2019 16:40:46 +0800</pubDate>
       
-      <guid>http://io.xsun.ltd/2019/11/my-first-post-test/</guid>
-      <description></description>
+      <guid>http://io.xsun.ltd/2019/11/tcp/http/https%E5%9F%BA%E7%A1%80/</guid>
+      <description>&lt;h2 id=&#34;https详细解析&#34;&gt;https详细解析&lt;/h2&gt;
+
+&lt;h3 id=&#34;https请求流程&#34;&gt;https请求流程&lt;/h3&gt;
+
+&lt;ol&gt;
+&lt;li&gt;客户端发起一个https的请求，把自身支持的一系列Cipher Suite（密钥算法套件，简称Cipher）发送给服务端&lt;/li&gt;
+&lt;li&gt;服务端，接收到客户端所有的Cipher后与自身支持的对比，如果不支持则连接断开，反之则会从中选出一种加密算法和HASH算法以证书的形式返回给客户端 证书中还包含了 公钥 颁证机构 网址 失效日期等等。&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;客户端收到服务端响应后会做以下几件事&lt;/p&gt;
+
+&lt;p&gt;3.1 验证证书的合法性：
+颁发证书的机构是否合法与是否过期，证书中包含的网站地址是否与正在访问的地址一致等。
+证书验证通过后，在浏览器的地址栏会加上一把小锁(每家浏览器验证通过后的提示不一样 不做讨论)&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;3.2 生成随机密码
+    如果证书验证通过，或者用户接受了不授信的证书，此时浏览器会生成一串随机数，然后用证书中的公钥加密。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;3.3 HASH握手信息
+用最开始约定好的HASH方式，把握手消息取HASH值，然后用 随机数加密“握手消息+握手消息HASH值(签名)”并一起发送给服务端
+在这里之所以要取握手消息的HASH值，主要是把握手消息做一个签名，用于验证握手消息在传输过程中没有被篡改过。
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;服务端拿到客户端传来的密文，用自己的私钥来解密握手消息取出随机数密码，再用随机数密码 解密 握手消息与HASH值，并与传过来的HASH值做对比确认是否一致。&lt;/p&gt;
+
+&lt;p&gt;然后用随机密码加密一段握手消息(握手消息+握手消息的HASH值 )给客户端&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;客户端用随机数解密并计算握手消息的HASH，如果与服务端发来的HASH一致，此时握手过程结束，之后所有的通信数据将由之前浏览器生成的随机密码并利用对称加密算法进行加密&lt;/p&gt;
+
+&lt;p&gt;因为这串密钥只有客户端和服务端知道，所以即使中间请求被拦截也是没法解密数据的，以此保证了通信的安全&lt;/p&gt;
+
+&lt;p&gt;非对称加密算法：RSA，DSA/DSS     在客户端与服务端相互验证的过程中用的是对称加密
+对称加密算法：AES，RC4，3DES     客户端与服务端相互验证通过后，以随机数作为密钥时，就是对称加密
+HASH算法：MD5，SHA1，SHA256  在确认握手消息没有被篡改时&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h3 id=&#34;tcp连接的建立与中止&#34;&gt;TCP连接的建立与中止&lt;/h3&gt;
+
+&lt;p&gt;&lt;strong&gt;三次握手&lt;/strong&gt;：&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://upload-images.jianshu.io/upload_images/11043-9923e3f3981f3cb4.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&#34; alt=&#34;image&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;1、clinet向server端发送一个[SYN]包，seq=x。&lt;/p&gt;
+
+&lt;p&gt;2、server收到[SYN]包之后，向clinet发送[SYN ACK] seq=y，ack=x+1&lt;/p&gt;
+
+&lt;p&gt;3、clinet收到server的syn和ack之后，再向server端发送[ACK]ack=y+1包，至此三次握手完成。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;对应状态&lt;/strong&gt;：&lt;/p&gt;
+
+&lt;p&gt;1、发起握手的时候，clinet发送[SYN]包之后，自身马上变成SYN_SENT状态，server则是进行了listen，自身的状态则变成LISTEN。接受到[SYN]包之后，自身变成SYN_RCVD状态。这个过程主要含义是clinet向server建立一条发送数据的连接。&lt;/p&gt;
+
+&lt;p&gt;2、server端收到了client的SYN之后，马上会发送一个[SYN ACK]包，这里一共有两个作用。ACK用于应答client，表示client-&amp;gt;server的连接已经建立，同时server也想向client建立一条发送数据的连接，因此也需要发送一个[SYN]包。&lt;/p&gt;
+
+&lt;p&gt;3、client收到了server的[SYN ACK]。通过server发的ACK确定了client-&amp;gt;server这条连接建立。自身状态变成了ESTABLISHED，表示可以正常的发送数据给server了。同时为了响应server发送的建立连接的SYN请求，再次给server做一次ACK的应答，一旦server收到clinet的ACK应答，server的状态也会变成ESTABLISHED。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;四次挥手&lt;/strong&gt;：&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://upload-images.jianshu.io/upload_images/11043-a0dcfd90c7842ffa.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&#34; alt=&#34;image&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;1、client发送[FIN]包，表示要断开clinet-&amp;gt;server的连接。&lt;/p&gt;
+
+&lt;p&gt;2、server收到[FIN]之后，发送一个[ACK]包表示确定断开连接啦。&lt;/p&gt;
+
+&lt;p&gt;3、同时server也会向clinet再发一个[FIN]包，表示也想断开server-&amp;gt;clinet的连接。&lt;/p&gt;
+
+&lt;p&gt;4、clinet收到server的[ACK]包，确定了clinet-&amp;gt;server的连接的断开，该连接将不会发送数据啦。由于client也会收到server的[FIN]包，因此也要为断开server-&amp;gt;clinet的连接发送[ACK]给server确定。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;对应状态&lt;/strong&gt;：&lt;/p&gt;
+
+&lt;p&gt;1、client和server端传送数据的时候，双方的状态都是ESTABLISHED。一旦clinet发送了fin之后，自身变成FIN-WAIT-1的状态，意思是等待server端的ack确定。此时，该通道不再向server发送数据，但是仍然可以接收server数据了。&lt;/p&gt;
+
+&lt;p&gt;2、server收到了clinet发送的ack之后，自身的状态由ESTABLISHED变成CLOSE_WAIT。client收到ack后，自身由FIN-WAIT-1变成FIN-WAIT-2，断开了连接。此时client在等待server端的fin信号。&lt;/p&gt;
+
+&lt;p&gt;3、server 发送ack之后，自身就由CLOSE_WAIT变成LAST-ACK状态，即等待client的最后的ack确定。client收到server的fin包之后，自身就由 FIN-WAIT-2 变成 TIME_WAIT状态，等待一个2MSL时间之后，就变成了CLOSED状态。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;HTTP报文解析&lt;/strong&gt;：&lt;/p&gt;
+
+&lt;p&gt;请求报文&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://s3.51cto.com/wyfs02/M02/22/DA/wKioL1MpX-qwK1-PAAExXPRpR8M814.jpg&#34; alt=&#34;image&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;响应报文&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://s3.51cto.com/wyfs02/M02/22/DB/wKiom1MpmHWALc2UAADu14JLceA655.jpg&#34; alt=&#34;image&#34; /&gt;&lt;/p&gt;</description>
     </item>
     
   </channel>
