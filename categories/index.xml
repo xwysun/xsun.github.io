@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Categories on xsun blog</title>
+    <link>http://io.xsun.ltd/categories/</link>
+    <description>Recent content in Categories on xsun blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>zh-cn</language>
+    <lastBuildDate>Sat, 23 Nov 2019 15:53:30 +0800</lastBuildDate>
+    
+	<atom:link href="http://io.xsun.ltd/categories/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>category</title>
+      <link>http://io.xsun.ltd/categories/category/</link>
+      <pubDate>Sat, 23 Nov 2019 15:53:30 +0800</pubDate>
+      
+      <guid>http://io.xsun.ltd/categories/category/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>subcategory</title>
+      <link>http://io.xsun.ltd/categories/subcategory/</link>
+      <pubDate>Sat, 23 Nov 2019 15:53:30 +0800</pubDate>
+      
+      <guid>http://io.xsun.ltd/categories/subcategory/</guid>
+      <description></description>
+    </item>
+    
+  </channel>
+</rss>
